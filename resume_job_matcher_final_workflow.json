@@ -1,0 +1,192 @@
+{
+  "meta": {
+    "instanceId": "generated-id-placeholder"
+  },
+  "workflows": [
+    {
+      "name": "Resume Job Matcher",
+      "nodes": [
+        {
+          "parameters": {
+            "mode": "everyMinute",
+            "options": {}
+          },
+          "name": "Schedule Trigger",
+          "type": "n8n-nodes-base.scheduleTrigger",
+          "typeVersion": 1,
+          "id": "scheduleTrigger"
+        },
+        {
+          "parameters": {
+            "authentication": "headerAuth",
+            "url": "https://mock-resume-input.com/resumes",
+            "options": {
+              "json": true
+            }
+          },
+          "name": "Simulated Resume Input",
+          "type": "n8n-nodes-base.httpRequest",
+          "typeVersion": 1,
+          "id": "simulatedResumeInput",
+          "queue": "main",
+          "description": "Simulates reading resumes from a source. In a real scenario, this would be a node like Google Drive, Dropbox, or a local file system reader."
+        },
+        {
+          "parameters": {
+            "function": "return items.map(item => ({\n  json: {\n    resumeName: item.json.fileName,\n    extractedText: `Extracted text from ${item.json.fileName}. This would be the output of a document parser or OCR.`\n  }\n}));"
+          },
+          "name": "Simulated Document Parsing",
+          "type": "n8n-nodes-base.function",
+          "typeVersion": 1,
+          "id": "simulatedDocumentParsing",
+          "queue": "main",
+          "description": "Simulates document parsing. In a real scenario, this would be a dedicated document parsing node or an OCR service."
+        },
+        {
+          "parameters": {
+            "function": "return items.map(item => ({\n  json: {\n    resumeName: item.json.resumeName,\n    extractedText: item.json.extractedText,\n    skills: [\n      \"Python\",\n      \"Data Analysis\",\n      \"Machine Learning\",\n      \"SQL\",\n      \"Cloud Computing\"\n    ],\n    jobTitles: [\n      \"Data Scientist\",\n      \"Software Engineer\"\n    ],\n    experienceSummary: \"Experienced professional with a strong background in data science and machine learning, skilled in developing and deploying predictive models.\"\n  }\n}));"
+          },
+          "name": "Simulated AI Resume Understanding",
+          "type": "n8n-nodes-base.function",
+          "typeVersion": 1,
+          "id": "simulatedAIResumeUnderstanding",
+          "queue": "main",
+          "description": "Simulates AI extraction of skills, job titles, and experience. In a real scenario, this would be an OpenAI or Hugging Face node."
+        },
+        {
+          "parameters": {
+            "batchSize": 1,
+            "options": {}
+          },
+          "name": "Split In Batches",
+          "type": "n8n-nodes-base.splitInBatches",
+          "typeVersion": 1,
+          "id": "splitInBatches",
+          "queue": "main"
+        },
+        {
+          "parameters": {
+            "authentication": "headerAuth",
+            "url": "https://mock-job-board.com/jobs?q={{ $json.jobTitles.join(' ') }} {{ $json.skills.join(' ') }}",
+            "options": {
+              "json": true
+            }
+          },
+          "name": "Simulated Job Search (LinkedIn)",
+          "type": "n8n-nodes-base.httpRequest",
+          "typeVersion": 1,
+          "id": "simulatedJobSearchLinkedIn",
+          "queue": "main",
+          "description": "Simulates searching LinkedIn. In a real scenario, this would be a web scraping node or a LinkedIn API integration."
+        },
+        {
+          "parameters": {
+            "authentication": "headerAuth",
+            "url": "https://mock-dice.com/jobs?q={{ $json.jobTitles.join(' ') }} {{ $json.skills.join(' ') }}",
+            "options": {
+              "json": true
+            }
+          },
+          "name": "Simulated Job Search (Dice)",
+          "type": "n8n-nodes-base.httpRequest",
+          "typeVersion": 1,
+          "id": "simulatedJobSearchDice",
+          "queue": "main",
+          "description": "Simulates searching Dice. In a real scenario, this would be a web scraping node or a Dice API integration."
+        },
+        {
+          "parameters": {
+            "authentication": "headerAuth",
+            "url": "https://mock-monster.com/jobs?q={{ $json.jobTitles.join(' ') }} {{ $json.skills.join(' ') }}",
+            "options": {
+              "json": true
+            }
+          },
+          "name": "Simulated Job Search (Monster)",
+          "type": "n8n-nodes-base.httpRequest",
+          "typeVersion": 1,
+          "id": "simulatedJobSearchMonster",
+          "queue": "main",
+          "description": "Simulates searching Monster. In a real scenario, this would be a web scraping node or a Monster API integration."
+        },
+        {
+          "parameters": {
+            "function": "const resumeSkills = $json.skills;\nconst jobResults = $input.all().map(item => item.json);\n\nconst matchedJobs = [];\n\nfor (const jobBoardResult of jobResults) {\n  if (jobBoardResult && jobBoardResult.jobs) {\n    for (const job of jobBoardResult.jobs) {\n      const jobSkills = job.skillsRequired || [];\n      let matchedSkillCount = 0;\n      for (const resumeSkill of resumeSkills) {\n        if (jobSkills.some(jobSkill => jobSkill.toLowerCase().includes(resumeSkill.toLowerCase()))) {\n          matchedSkillCount++;\n        }\n      }\n      const skillMatchPercentage = (matchedSkillCount / resumeSkills.length) * 100;\n\n      if (skillMatchPercentage >= 60) {\n        matchedJobs.push({\n          resumeName: $json.resumeName,\n          matchedJobTitle: job.jobTitle,\n          company: job.company,\n          skillsMatched: jobSkills.filter(jobSkill => resumeSkills.some(resumeSkill => jobSkill.toLowerCase().includes(resumeSkill.toLowerCase()))),\n          fullJobDescription: job.jobDescription,\n          linkToApply: job.linkToApply\n        });\n      }\n    }\n  }\n}\n\nreturn [{ json: { matchedJobs: matchedJobs } }];"
+          },
+          "name": "Filter and Format Jobs",
+          "type": "n8n-nodes-base.function",
+          "typeVersion": 1,
+          "id": "filterAndFormatJobs",
+          "queue": "main",
+          "description": "Filters jobs based on skill match and formats the output."
+        },
+        {
+          "parameters": {
+            "fileName": "matched_jobs_{{ $json.resumeName }}.json",
+            "data": "{{ JSON.stringify($json.matchedJobs, null, 2) }}",
+            "options": {}
+          },
+          "name": "Save Matched Jobs (JSON)",
+          "type": "n8n-nodes-base.writeFile",
+          "typeVersion": 1,
+          "id": "saveMatchedJobsJson",
+          "queue": "main",
+          "description": "Saves the matched jobs in a JSON file. Can be replaced with Airtable or Google Sheets node."
+        }
+      ],
+      "connections": {
+        "scheduleTrigger": [
+          [
+            "simulatedResumeInput"
+          ]
+        ],
+        "simulatedResumeInput": [
+          [
+            "simulatedDocumentParsing"
+          ]
+        ],
+        "simulatedDocumentParsing": [
+          [
+            "simulatedAIResumeUnderstanding"
+          ]
+        ],
+        "simulatedAIResumeUnderstanding": [
+          [
+            "splitInBatches"
+          ]
+        ],
+        "splitInBatches": [
+          [
+            "simulatedJobSearchLinkedIn"
+          ]
+        ],
+        "simulatedJobSearchLinkedIn": [
+          [
+            "simulatedJobSearchDice"
+          ]
+        ],
+        "simulatedJobSearchDice": [
+          [
+            "simulatedJobSearchMonster"
+          ]
+        ],
+        "simulatedJobSearchMonster": [
+          [
+            "filterAndFormatJobs"
+          ]
+        ],
+        "filterAndFormatJobs": [
+          [
+            "saveMatchedJobsJson"
+          ]
+        ]
+      },
+      "active": false,
+      "settings": {},
+      "versionId": "v1",
+      "id": "1",
+      "type": "workflow",
+      "tags": []
+    }
+  ]
+}
